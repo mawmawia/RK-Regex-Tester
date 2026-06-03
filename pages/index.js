@@ -1,177 +1,152 @@
-import { useState } from 'react'
-import Head from 'next/head'
+import { useState, useEffect } from 'react';
 
-export default function Regex() {
-  const [pattern, setPattern] = useState('\\d+')
-  const [flags, setFlags] = useState('g')
-  const [testString, setTestString] = useState('order 123 shipped 456 failed')
-  const [email, setEmail] = useState('')
-  const [copied, setCopied] = useState(false)
+export default function Home() {
+  const [pattern, setPattern] = useState('\\d+');
+  const [flags, setFlags] = useState('g');
+  const [testString, setTestString] = useState('order 123 shipped 456 failed');
+  const [result, setResult] = useState(null);
+  const [email, setEmail] = useState('');
+  const [alertStatus, setAlertStatus] = useState('');
 
-  let matches = []
-  let error = null
-  try {
-    const re = new RegExp(pattern, flags)
-    matches = [...testString.matchAll(re)]
-  } catch (e) {
-    error = e.message
+  useEffect(() => {
+    testRegex();
+  }, [pattern, flags, testString]);
+
+  async function testRegex() {
+    try {
+      const res = await fetch(`/api/test?pattern=${encodeURIComponent(pattern)}&flags=${flags}&test=${encodeURIComponent(testString)}`);
+      const data = await res.json();
+      setResult(data);
+    } catch (e) {
+      setResult({ error: 'Invalid regex' });
+    }
   }
 
-  const saveRegex = async () => {
-    if (!email) return alert('Add email for break alerts')
-    await fetch('/api/regex-save', {
+  function copyJSON() {
+    navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+  }
+
+  async function subscribeAlert() {
+    setAlertStatus('Setting up...');
+    const res = await fetch('/api/monitor', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pattern, flags, testString, email })
-    })
-    alert('Monitoring active. You will get alerts if this regex stops matching.')
-  }
-
-  const copyOutput = () => {
-    const output = JSON.stringify(matches.map(m => ({
-      match: m[0],
-      index: m.index,
-      groups: m.slice(1)
-    })), null, 2)
-    navigator.clipboard.writeText(output)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+      body: JSON.stringify({ email, pattern, flags, testString })
+    });
+    setAlertStatus(res.ok ? 'Alert active. Check email.' : 'Failed. Try again.');
   }
 
   return (
-    <>
-      <Head>
-        <title>RK Regex Tester - Rael_Kertia Empire</title>
-        <meta name="description" content="Test regex patterns. Get alerts when production data stops matching." />
-      </Head>
-      
-      <div className="min-h-screen bg-[#0a0a0a] text-gray-100 font-mono">
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          
-          {/* Header - Matches RK JSON */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">RK Regex Tester</h1>
-            <p className="text-gray-400 text-sm">
-              Test patterns. Debug matches. Get alerts when prod data breaks. 
-              <span className="text-blue-400 ml-2">Part of Rael_Kertia Empire</span>
-            </p>
-          </div>
+    <div className="min-h-screen bg-gray-950 text-gray-100">
+      <div className="max-w-4xl mx-auto px-4 py-12">
+        
+        <header className="mb-12">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent mb-2">
+            RK Regex Tester
+          </h1>
+          <p className="text-gray-400">
+            Test patterns. Debug matches. Get alerts when prod data breaks. Part of Rael_Kertia Empire
+          </p>
+        </header>
 
-          {/* Input Section */}
-          <div className="bg-[#111] border border-[#222] rounded-lg p-5 mb-4">
-            <label className="text-xs text-gray-500 uppercase tracking-wider">Pattern</label>
-            <div className="flex gap-2 items-center mt-2 mb-4">
-              <span className="text-gray-600 text-lg">/</span>
-              <input
-                value={pattern}
-                onChange={e => setPattern(e.target.value)}
-                className="bg-[#0a0a0a] text-green-400 px-3 py-2 flex-1 rounded border border-[#222] focus:border-blue-500 focus:outline-none text-sm"
-                placeholder="your-regex-pattern"
-                spellCheck="false"
-              />
-              <span className="text-gray-600 text-lg">/</span>
-              <input
-                value={flags}
-                onChange={e => setFlags(e.target.value)}
-                className="bg-[#0a0a0a] text-yellow-400 px-3 py-2 w-16 rounded border border-[#222] focus:border-blue-500 focus:outline-none text-sm text-center"
-                placeholder="gi"
-                spellCheck="false"
-              />
+        <div className="grid md:grid-cols-2 gap-8 mb-8">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Pattern</label>
+              <div className="flex items-center bg-gray-900 border border-gray-800 rounded-lg overflow-hidden focus-within:border-blue-500">
+                <span className="px-3 text-gray-500">/</span>
+                <input 
+                  value={pattern}
+                  onChange={e => setPattern(e.target.value)}
+                  className="flex-1 bg-transparent py-3 outline-none font-mono text-cyan-300"
+                  placeholder="\d+"
+                />
+                <span className="px-3 text-gray-500">/</span>
+                <input 
+                  value={flags}
+                  onChange={e => setFlags(e.target.value)}
+                  className="w-16 bg-gray-800 py-3 px-2 outline-none font-mono text-yellow-400 text-center"
+                  placeholder="g"
+                />
+              </div>
             </div>
 
-            <label className="text-xs text-gray-500 uppercase tracking-wider">Test String</label>
-            <textarea
-              value={testString}
-              onChange={e => setTestString(e.target.value)}
-              className="bg-[#0a0a0a] text-gray-300 p-3 w-full h-32 mt-2 rounded border border-[#222] focus:border-blue-500 focus:outline-none text-sm resize-none"
-              placeholder="Paste your test data here..."
-              spellCheck="false"
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Test String</label>
+              <textarea
+                value={testString}
+                onChange={e => setTestString(e.target.value)}
+                className="w-full bg-gray-900 border border-gray-800 rounded-lg p-3 font-mono text-gray-100 focus:border-blue-500 outline-none resize-none"
+                rows="4"
+                placeholder="order 123 shipped 456"
+              />
+            </div>
           </div>
 
-          {/* Output Section */}
-          <div className="bg-[#111] border border-[#222] rounded-lg p-5 mb-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
             <div className="flex justify-between items-center mb-3">
-              <label className="text-xs text-gray-500 uppercase tracking-wider">
-                {error? 'Error' : `Matches: ${matches.length}`}
-              </label>
-              {!error && matches.length > 0 && (
-                <button
-                  onClick={copyOutput}
-                  className="text-xs text-blue-400 hover:text-blue-300"
-                >
-                  {copied? 'Copied!' : 'Copy JSON'}
-                </button>
-              )}
-            </div>
-            
-            <div className="bg-[#0a0a0a] rounded border border-[#222] p-3 min-h-[120px] max-h-[300px] overflow-y-auto">
-              {error? (
-                <p className="text-red-400 text-sm">{error}</p>
-              ) : matches.length === 0? (
-                <p className="text-gray-600 text-sm">No matches found</p>
-              ) : (
-                <div className="space-y-2">
-                  {matches.map((m, i) => (
-                    <div key={i} className="text-sm">
-                      <span className="text-green-400">"{m[0]}"</span>
-                      <span className="text-gray-600 ml-3">index: {m.index}</span>
-                      {m.length > 1 && (
-                        <span className="text-blue-400 ml-3">
-                          groups: [{m.slice(1).map(g => `"${g}"`).join(', ')}]
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Monitor Section - Matches RK JSON style */}
-          <div className="bg-[#111] border border-[#222] rounded-lg p-5 mb-8">
-            <h2 className="text-sm font-semibold text-white mb-1">Monitor this regex</h2>
-            <p className="text-xs text-gray-500 mb-4">
-              Get email alerts when this pattern stops matching your production logs
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@company.com"
-                className="bg-[#0a0a0a] text-gray-300 px-3 py-2 flex-1 rounded border border-[#222] focus:border-blue-500 focus:outline-none text-sm"
-              />
-              <button
-                onClick={saveRegex}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded text-sm font-medium transition-colors"
+              <h3 className="font-medium text-gray-300">
+                Matches: <span className="text-cyan-400">{result?.count || 0}</span>
+              </h3>
+              <button 
+                onClick={copyJSON}
+                className="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded border border-gray-700"
               >
-                Get Alerts
+                Copy JSON
               </button>
             </div>
-            <p className="text-[10px] text-gray-600 mt-3">
-              Free tier: 100k requests/month. API access on $15/mo plan.
-            </p>
-          </div>
-
-          {/* Footer - Empire Links */}
-          <div className="border-t border-[#222] pt-6 text-xs text-gray-600">
-            <div className="flex gap-4 mb-2">
-              <a href="https://cron.raels.dev" className="hover:text-gray-400 transition-colors">
-                RK Cron Monitor
-              </a>
-              <span className="text-gray-700">•</span>
-              <a href="https://json.raels.dev" className="hover:text-gray-400 transition-colors">
-                RK JSON Tools
-              </a>
-              <span className="text-gray-700">•</span>
-              <span className="text-gray-500">RK Regex Tester</span>
+            
+            <div className="space-y-2 max-h-64 overflow-auto">
+              {result?.error && <div className="text-red-400 text-sm">{result.error}</div>}
+              {result?.matches?.map((m, i) => (
+                <div key={i} className="bg-gray-950 p-2 rounded border border-gray-800 text-sm">
+                  <span className="text-green-400 font-mono">"{m.match}"</span>
+                  <span className="text-gray-500 ml-2">index: {m.index}</span>
+                </div>
+              ))}
+              {result?.count === 0 && <div className="text-gray-500 text-sm">No matches</div>}
             </div>
-            <p>Rael_Kertia Empire © 2026</p>
           </div>
-
         </div>
+
+        <div className="bg-gradient-to-br from-gray-900 to-gray-950 border border-gray-800 rounded-xl p-6 mb-8">
+          <h2 className="text-xl font-bold mb-2">Monitor this regex</h2>
+          <p className="text-gray-400 text-sm mb-4">
+            Get email alerts when this pattern stops matching your production logs
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@company.com"
+              className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 outline-none focus:border-blue-500"
+            />
+            <button 
+              onClick={subscribeAlert}
+              className="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-lg font-medium"
+            >
+              Get Alerts
+            </button>
+          </div>
+          {alertStatus && <div className="text-sm text-cyan-400 mt-2">{alertStatus}</div>}
+          <p className="text-gray-600 text-xs mt-4">
+            Free tier: 100k requests/month. API access on $15/mo plan.
+          </p>
+        </div>
+
+        <footer className="border-t border-gray-800 pt-6 text-sm text-gray-500">
+          <div className="flex gap-4 mb-2">
+            <a href="https://rk-cron.raels.dev" className="hover:text-blue-400">RK Cron Monitor</a>
+            <span>•</span>
+            <a href="https://rk-json.raels.dev" className="hover:text-blue-400">RK JSON Tools</a>
+            <span>•</span>
+            <a href="https://regex.raels.dev" className="hover:text-blue-400">RK Regex Tester</a>
+          </div>
+          <div>Rael_Kertia Empire © 2026</div>
+        </footer>
+
       </div>
-    </>
-  )
-            }
+    </div>
+  );
+              }
